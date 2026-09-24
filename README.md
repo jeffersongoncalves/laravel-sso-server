@@ -37,6 +37,8 @@ Prints the `client_id` and `client_secret`. The secret is stored encrypted, sinc
 
 ### Endpoints
 
+The full protocol and client integration contract is in [docs/architecture.md](docs/architecture.md).
+
 | Method | URI | Purpose |
 |--------|-----|---------|
 | GET | `/sso/authorize` | Authorization Code + PKCE (`S256` only). Runs behind `auth`, so guests go to your login page first. Requires `client_id`, `redirect_uri` (exact match), `state`, `code_challenge`, `code_challenge_method=S256`. |
