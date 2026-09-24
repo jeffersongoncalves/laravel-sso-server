@@ -43,9 +43,37 @@ class TestCase extends Orchestra
 
         $app['config']->set('app.key', 'base64:2fl+Ktvkfl+Fuz4Qp/A75G2RTiWVA/ZoKZvp6fiiM10=');
         $app['config']->set('database.default', 'testing');
+        $app['config']->set('database.connections.testing', $this->testing_connection());
         $app['config']->set('app.url', 'https://idp.test');
         $app['config']->set('auth.providers.users.model', User::class);
         $app['config']->set('sso-server.keys.path', $this->keysPath);
+    }
+
+    /**
+     * In-memory SQLite locally; CI (tests.yml) sets SSO_SERVER_TEST_DB_* to run
+     * the same suite against MySQL and PostgreSQL. Not the plain DB_* names:
+     * Testbench sets DB_CONNECTION=testing itself and would always win.
+     *
+     * @return array<string, mixed>
+     */
+    protected function testing_connection(): array
+    {
+        $driver = env('SSO_SERVER_TEST_DB_DRIVER', 'sqlite');
+
+        if ($driver === 'sqlite') {
+            return ['driver' => 'sqlite', 'database' => ':memory:', 'prefix' => '', 'foreign_key_constraints' => true];
+        }
+
+        return [
+            'driver' => $driver,
+            'host' => env('SSO_SERVER_TEST_DB_HOST', '127.0.0.1'),
+            'port' => env('SSO_SERVER_TEST_DB_PORT'),
+            'database' => env('SSO_SERVER_TEST_DB_DATABASE', 'testing'),
+            'username' => env('SSO_SERVER_TEST_DB_USERNAME', 'root'),
+            'password' => env('SSO_SERVER_TEST_DB_PASSWORD', ''),
+            'charset' => $driver === 'pgsql' ? 'utf8' : 'utf8mb4',
+            'prefix' => '',
+        ];
     }
 
     protected function defineDatabaseMigrations(): void
