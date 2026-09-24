@@ -165,6 +165,77 @@ it('rotates keys keeping the previous one in the jwks', function () {
     expect($this->getJson('/.well-known/jwks.json')->json('keys'))->toHaveCount(2);
 });
 
+it('exposes email_verified and fails closed', function () {
+    $client = $this->makeClient();
+    $verified = $this->makeUser();
+    $verified->forceFill(['email_verified_at' => now()])->save();
+
+    $claims = fn ($user) => json_decode(ServerTokenManager::base64UrlDecode(
+        explode('.', exchange($this, $client, obtainCode($this, $client, $user))->json('access_token'))[1]
+    ), true);
+
+    expect($claims($verified)['email_verified'])->toBeTrue()
+        ->and($claims($this->makeUser())['email_verified'])->toBeFalse();
+
+    $token = exchange($this, $client, obtainCode($this, $client, $verified))->json('access_token');
+    $this->withToken($token)->get('/sso/userinfo')->assertJsonPath('email_verified', true);
+});
+
+function logoutQuery($client, string $token, array $overrides = []): string
+{
+    return '/sso/logout?'.http_build_query(array_merge([
+        'client_id' => $client->client_id,
+        'token_hint' => $token,
+        'post_logout_redirect_uri' => 'https://client.test/bye',
+        'state' => 'st-123',
+    ], $overrides));
+}
+
+it('logs out from a client, notifying only the other clients', function () {
+    Queue::fake();
+    $a = $this->makeClient();
+    $b = $this->makeClient(['redirect_uri' => 'https://other.test/cb', 'slo_webhook_url' => 'https://other.test/slo']);
+    $user = $this->makeUser();
+
+    $token = exchange($this, $a, obtainCode($this, $a, $user))->json('access_token');
+    exchange($this, $b, obtainCode($this, $b, $user));
+
+    $this->actingAs($user)->get(logoutQuery($a, $token))->assertRedirect('https://client.test/bye?state=st-123');
+
+    $this->assertGuest();
+    expect(SsoActiveSession::count())->toBe(0);
+    Queue::assertPushed(DispatchSingleLogoutJob::class, 1);
+    Queue::assertPushed(DispatchSingleLogoutJob::class, fn ($job) => $job->client->is($b));
+});
+
+it('accepts an expired token hint but not a foreign one', function () {
+    Queue::fake();
+    $a = $this->makeClient();
+    $b = $this->makeClient();
+    $user = $this->makeUser();
+    $token = exchange($this, $a, obtainCode($this, $a, $user))->json('access_token');
+
+    $this->travel(2)->hours();
+
+    $this->get(logoutQuery($b, $token))->assertStatus(400);
+    $this->get(logoutQuery($a, 'not.a.token'))->assertStatus(400);
+    $this->get(logoutQuery($a, $token, ['post_logout_redirect_uri' => 'https://evil.test/']))->assertStatus(400);
+
+    $this->get(logoutQuery($a, $token, ['post_logout_redirect_uri' => null, 'state' => null]))->assertRedirect('/');
+    expect(SsoActiveSession::count())->toBe(0);
+});
+
+it('does not log out a different user sharing the browser', function () {
+    Queue::fake();
+    $client = $this->makeClient();
+    $token = exchange($this, $client, obtainCode($this, $client, $this->makeUser()))->json('access_token');
+    $other = $this->makeUser();
+
+    $this->actingAs($other)->get(logoutQuery($client, $token))->assertRedirect();
+
+    $this->assertAuthenticatedAs($other);
+});
+
 it('creates clients and prunes expired sessions', function () {
     $this->artisan('sso-server:client', ['name' => 'App', 'redirect_uri' => 'https://app.test/cb'])->assertSuccessful();
     $this->artisan('sso-server:client', ['name' => 'Bad', 'redirect_uri' => 'not-a-url'])->assertFailed();

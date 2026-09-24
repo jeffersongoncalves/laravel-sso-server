@@ -87,6 +87,30 @@ class ServerTokenManager implements TokenRepositoryContract
 
     public function validateAccessToken(string $token): ?array
     {
+        $claims = $this->verifiedClaims($token);
+
+        if ($claims === null || ($claims['exp'] ?? 0) < time()) {
+            return null;
+        }
+
+        // Signature alone is not enough: the session row disappears on logout.
+        $alive = SsoActiveSession::query()
+            ->where('session_token_hash', hash('sha256', $token))
+            ->where('expires_at', '>', now())
+            ->exists();
+
+        return $alive ? $claims : null;
+    }
+
+    /**
+     * Claims of a token this server signed (RS256, known kid, our issuer),
+     * ignoring expiry and revocation. Only for proving who a token was issued
+     * to, e.g. a logout hint; use validateAccessToken() to authorize access.
+     *
+     * @return array<string, mixed>|null
+     */
+    public function verifiedClaims(string $token): ?array
+    {
         $parts = explode('.', $token);
 
         if (count($parts) !== 3) {
@@ -106,17 +130,7 @@ class ServerTokenManager implements TokenRepositoryContract
             return null;
         }
 
-        if (($claims['iss'] ?? null) !== $this->issuer() || ($claims['exp'] ?? 0) < time()) {
-            return null;
-        }
-
-        // Signature alone is not enough: the session row disappears on logout.
-        $alive = SsoActiveSession::query()
-            ->where('session_token_hash', hash('sha256', $token))
-            ->where('expires_at', '>', now())
-            ->exists();
-
-        return $alive ? $claims : null;
+        return ($claims['iss'] ?? null) === $this->issuer() ? $claims : null;
     }
 
     // --- Users & Single Logout -----------------------------------------------
@@ -134,9 +148,11 @@ class ServerTokenManager implements TokenRepositoryContract
     /**
      * Revokes every session of the user and notifies each client through a
      * signed back-channel webhook. Expired rows are included on purpose: a
-     * client's local session can outlive the access token.
+     * client's local session can outlive the access token. $initiator (the
+     * client that asked for the logout) has its sessions revoked but gets no
+     * webhook: it already logged the user out locally.
      */
-    public function logoutUser(string $userId): void
+    public function logoutUser(string $userId, ?SsoClient $initiator = null): void
     {
         $sessions = SsoActiveSession::query()->with('client')->where('user_id', $userId)->get();
 
@@ -149,7 +165,7 @@ class ServerTokenManager implements TokenRepositoryContract
         $clients = $sessions->pluck('client')->filter()->unique('id');
 
         $clients
-            ->filter(fn (SsoClient $client) => $client->is_active && filled($client->slo_webhook_url))
+            ->filter(fn (SsoClient $client) => $client->is_active && filled($client->slo_webhook_url) && ! $client->is($initiator))
             ->each(fn (SsoClient $client) => DispatchSingleLogoutJob::dispatch($client, $userId));
 
         event(new UserLoggedOutEvent($userId, $clients->pluck('client_id')->values()->all()));

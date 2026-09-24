@@ -45,6 +45,7 @@ The full protocol and client integration contract is in [docs/architecture.md](d
 | POST | `/sso/token` | Exchanges the one-time code (`grant_type=authorization_code`, `client_id`, `client_secret`, `code`, `redirect_uri`, `code_verifier`) for an RS256 access token. |
 | GET | `/sso/userinfo` | Current claims for a `Bearer` token. Signed with `X-SSO-Timestamp` + `X-SSO-Signature`. |
 | GET | `/.well-known/jwks.json` | Public keys used to verify access tokens. |
+| GET | `/sso/logout` | Client-initiated federated logout (browser redirect). Requires `client_id` and a `token_hint` issued to that client; optional same-origin `post_logout_redirect_uri` and `state`. |
 
 ### Security model
 
@@ -79,6 +80,7 @@ class TenantUserSerializer implements SsoUserSerializerContract
         return [
             'name' => $user->name,
             'email' => $user->email,
+            'email_verified' => $user->hasVerifiedEmail(),
             'roles' => $user->getRoleNames(),
             'tenant_id' => $user->tenant_id,
         ];
@@ -87,6 +89,8 @@ class TenantUserSerializer implements SsoUserSerializerContract
 ```
 
 Reserved claims (`iss`, `sub`, `aud`, `iat`, `nbf`, `exp`, `jti`) are always set by the server.
+
+The default serializer sends `name`, `email` and `email_verified`. Keep `email_verified` in custom serializers: clients rely on it before linking accounts by email.
 
 ### Maintenance
 
