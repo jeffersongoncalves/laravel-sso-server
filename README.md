@@ -1,6 +1,6 @@
 <div class="filament-hidden">
 
-<!-- banner: art/jeffersongoncalves-laravel-sso-server.png (generate via portfolio-banner skill) -->
+![Laravel SSO Server](https://raw.githubusercontent.com/jeffersongoncalves/laravel-sso-server/main/art/jeffersongoncalves-laravel-sso-server.png)
 
 </div>
 
