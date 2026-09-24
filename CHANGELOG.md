@@ -2,6 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.0 - 2026-09-24
+
+### Features
+
+- `email_verified` claim in the JWT and `/sso/userinfo` (from `MustVerifyEmail` or `email_verified_at`, `false` otherwise). Clients must not link accounts by email unless it is `true`.
+- `GET /sso/logout`: client-initiated (RP-initiated) federated logout. Requires a `token_hint` issued to the calling client (expired tokens accepted), revokes the user's sessions, sends the SLO webhook to the other clients, ends the IdP session when it belongs to the same user, and redirects to a same-origin `post_logout_redirect_uri` with `state`.
+- Laravel Boost guideline and skills (`sso-server-setup`, `sso-server-clients`).
+
+### Dependencies
+
+- Dropped the direct `guzzlehttp/guzzle` requirement: Guzzle now follows `illuminate/http` (`^7.8.2 || ^8.0`), so Guzzle 8 installs.
+
+### Docs
+
+- `docs/architecture.md` protocol and integration contract (new §3.5), security policy.
+
+Backward compatible with 1.0.0. Tested on PHP 8.4 + Laravel 13 against SQLite, MySQL and PostgreSQL.
+
+**Full Changelog**: https://github.com/jeffersongoncalves/laravel-sso-server/compare/1.0.0...1.1.0
+
 ## 1.0.0 - 2026-09-24
 
 Initial release.
