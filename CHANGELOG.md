@@ -2,6 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## 1.1.1 - 2026-10-10
+
+### Fixed
+
+- Key rotation: the newest key now always signs, even after two rotations within the same second. Key ids include microseconds (`YmdHisu-<random>`); existing keys keep working and sort before new ones, so no action is needed.
+
+### Tests
+
+- New security suite: forged tokens (alg none, alg confusion, path traversal kid, swapped sub), foreign issuer, expired tokens and codes, revoked clients, logout redirect origin checks, key pruning and Single Logout webhook retries. 13 → 28 tests.
+
+**Full Changelog**: https://github.com/jeffersongoncalves/laravel-sso-server/compare/1.1.0...1.1.1
+
 ## 1.1.0 - 2026-09-24
 
 ### Features
