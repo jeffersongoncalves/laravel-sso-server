@@ -211,7 +211,10 @@ class ServerTokenManager implements TokenRepositoryContract
         }
 
         $details = openssl_pkey_get_details($key);
-        $kid = now()->format('YmdHis').'-'.Str::lower(Str::random(6));
+        // Kids sort by creation time, so the newest one signs. Microseconds keep
+        // that order for rotations within the same second; legacy "YmdHis-" kids
+        // still sort first because "-" precedes every digit.
+        $kid = now()->format('YmdHisu').'-'.Str::lower(Str::random(6));
 
         file_put_contents("{$path}/{$kid}.key", $private);
         chmod("{$path}/{$kid}.key", 0600);
