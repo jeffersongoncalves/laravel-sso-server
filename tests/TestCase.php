@@ -5,6 +5,7 @@ namespace JeffersonGoncalves\SsoServer\Tests;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\File;
 use Illuminate\Support\Str;
+use JeffersonGoncalves\PestPluginDatabaseMigrations\LoadsPackageMigrations;
 use JeffersonGoncalves\SsoServer\Models\SsoClient;
 use JeffersonGoncalves\SsoServer\SsoServerServiceProvider;
 use JeffersonGoncalves\SsoServer\Tests\Models\User;
@@ -12,6 +13,7 @@ use Orchestra\Testbench\TestCase as Orchestra;
 
 class TestCase extends Orchestra
 {
+    use LoadsPackageMigrations;
     use RefreshDatabase;
 
     protected string $keysPath;
@@ -79,17 +81,7 @@ class TestCase extends Orchestra
     protected function defineDatabaseMigrations(): void
     {
         $this->loadMigrationsFrom(__DIR__.'/database/migrations');
-
-        // Stubs are published into the host app; mirror that here, in order
-        // (sessions reference clients).
-        $tempPath = sys_get_temp_dir().'/laravel-sso-server-migrations';
-        File::ensureDirectoryExists($tempPath);
-
-        foreach (['create_sso_clients_table', 'create_sso_active_sessions_table'] as $index => $name) {
-            copy(__DIR__."/../database/migrations/{$name}.php.stub", $tempPath.sprintf('/%03d_%s.php', $index, $name));
-        }
-
-        $this->loadMigrationsFrom($tempPath);
+        $this->loadPackageMigrations(SsoServerServiceProvider::class);
     }
 
     protected function makeClient(array $attributes = []): SsoClient

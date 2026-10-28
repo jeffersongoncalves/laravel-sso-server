@@ -35,6 +35,7 @@
         "illuminate/support": "^11.0|^12.0|^13.0"
     },
     "require-dev": {
+        "jeffersongoncalves/pest-plugin-database-migrations": "^1.0",
         "larastan/larastan": "^3.0",
         "laravel/pint": "^1.24",
         "orchestra/testbench": "^10.0|^11.0",
